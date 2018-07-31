@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="poi:poi:3.0-FINAL" type="repository">
+    <properties maven-id="poi:poi:3.0-FINAL" />
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/lib/poi-3.0-FINAL.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/commons-logging-1.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/log4j-1.2.13.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
