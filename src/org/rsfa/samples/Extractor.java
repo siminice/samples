@@ -2,6 +2,7 @@ package org.rsfa.samples;
 
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.util.CellReference;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xssf.usermodel.helpers.ColumnHelper;
@@ -29,6 +30,9 @@ public class Extractor {
 
     private String grid[][];
     private Set<String> ids = new HashSet<>();
+    private Map<String, List<CellReference>> refs = new HashMap<>();
+    private Map<String, List<CellReference>> scores = new HashMap<>();
+    private Map<String, String> anon = new HashMap<>();
     private int numRows = 0;
     private int numCols = 0;
 
@@ -89,42 +93,48 @@ public class Extractor {
     public void extract() {
         wbout = new XSSFWorkbook();
         initStyles();
-        XSSFSheet sheet = wbout.createSheet("Grid");
-        Row header = sheet.createRow(0);
+        XSSFSheet gridSheet = wbout.createSheet("Grid");
+        Row header = gridSheet.createRow(0);
         header.createCell(0);
         header.createCell(1);
         for (int c = 0; c < numCols; c++) {
             Cell cellId = header.createCell(2*c+2);
             cellId.setCellStyle(hcolStyle);
             cellId.setCellValue(String.format("ID %d", c+1));
-            sheet.setColumnWidth(2*c+2, 256*18);
+            gridSheet.setColumnWidth(2*c+2, 256*18);
             //sheet.autoSizeColumn(2*c+2);
 
             Cell cellValue = header.createCell(2*c+3);
             cellValue.setCellStyle(hcolStyle);
             cellValue.setCellValue(String.format("S %d", c+1));
-            sheet.setColumnWidth(2*c+3, 256*6);
+            gridSheet.setColumnWidth(2*c+3, 256*6);
             //sheet.autoSizeColumn(2*c+3);
         }
-        sheet.setAutobreaks(false);
-        sheet.setRowBreak(50);
-        sheet.setColumnBreak(24);
-        sheet.setColumnHidden(1, true);
+        gridSheet.setAutobreaks(false);
+        gridSheet.setRowBreak(50);
+        gridSheet.setColumnBreak(24);
+        gridSheet.setColumnHidden(1, true);
         for (int r = 0; r < numRows; r++) {
-            Row row = sheet.createRow(r+1);
+            Row row = gridSheet.createRow(r+1);
             Cell num = row.createCell(0);
             num.setCellValue(r+1);
             Cell hidden = row.createCell(1);
 
             for (int c = 0; c < numCols; c++) {
-                if (grid[r][c] != null) {
+                String id = grid[r][c];
+                if (id != null) {
                     Cell cellId = row.createCell(2*c+2);
                     cellId.setCellStyle(idStyle);
-                    cellId.setCellValue(grid[r][c]);
-                    ids.add(grid[r][c]);
+                    cellId.setCellValue(id);
+                    addCellReference(refs, id,
+                            new CellReference(gridSheet.getSheetName(), r+1, 2*c+2, false, false));
+                    ids.add(id);
 
                     Cell cellValue = row.createCell(2*c+3);
                     cellValue.setCellStyle(vStyle);
+                    cellValue.setCellValue(-1);
+                    addCellReference(scores, id,
+                            new CellReference(gridSheet.getSheetName(), r+1, 2*c+3, false, false));
                 }
             }
         }
@@ -150,16 +160,89 @@ public class Extractor {
         for (String id : uniqueIds) {
             Row rowi = listSheet.createRow(numIds+1);
             Cell c1 = rowi.createCell(0);
-            c1.setCellValue(numIds+1);
+            String aid = String.format("Anon-%03d",numIds+1);
+            c1.setCellValue(aid);
+            anon.put(id, aid);
             Cell c2 = rowi.createCell(1);
             c2.setCellValue(id);
-            Cell c3 = rowi.createCell(2);
+            List<CellReference> lr = scores.get(id);
+            for (int sc = 0; sc < (lr != null ? lr.size() : 0); sc++) {
+                CellReference ref = lr.get(sc);
+                Cell c3 = rowi.createCell(2 + sc);
+                c3.setCellFormula(ref.formatAsString());
+            }
             numIds++;
         }
         listSheet.autoSizeColumn(0);
         listSheet.autoSizeColumn(1);
+
+        // Anonymized grid
+        createAnonGridSheet(wbout, gridSheet);
+
     }
 
+    private void createGridSheet(XSSFWorkbook wb) {
+
+    }
+
+    private void createListSheet(XSSFWorkbook wb) {
+
+    }
+
+    private void createAnonGridSheet(XSSFWorkbook wb, XSSFSheet gSheet) {
+        XSSFSheet sheet = wb.createSheet("AnonGrid");
+        Row header = sheet.createRow(0);
+        header.createCell(0);
+        header.createCell(1);
+        for (int c = 0; c < numCols; c++) {
+            Cell cellId = header.createCell(2*c+2);
+            cellId.setCellStyle(hcolStyle);
+            cellId.setCellValue(String.format("ID %d", c+1));
+            sheet.setColumnWidth(2*c+2, 256*18);
+
+            Cell cellValue = header.createCell(2*c+3);
+            cellValue.setCellStyle(hcolStyle);
+            cellValue.setCellValue(String.format("S %d", c+1));
+            sheet.setColumnWidth(2*c+3, 256*6);
+        }
+        sheet.setAutobreaks(false);
+        sheet.setRowBreak(50);
+        sheet.setColumnBreak(24);
+        sheet.setColumnHidden(1, true);
+        for (int r = 0; r < numRows; r++) {
+            Row row = sheet.createRow(r+1);
+            Cell num = row.createCell(0);
+            num.setCellValue(r+1);
+            Cell hidden = row.createCell(1);
+
+            for (int c = 0; c < numCols; c++) {
+                String id = grid[r][c];
+                if (id != null) {
+                    Cell cellId = row.createCell(2*c+2);
+                    cellId.setCellStyle(idStyle);
+                    cellId.setCellValue(anon.get(id));
+
+                    Cell cellValue = row.createCell(2*c+3);
+                    cellValue.setCellStyle(vStyle);
+                    CellReference gc = new CellReference(gSheet.getSheetName(), r+1, 2*c+3, false, false);
+                    cellValue.setCellFormula(gc.formatAsString());
+                }
+            }
+        }
+    }
+
+    private void addCellReference(
+            Map<String, List<CellReference>> map,
+            final String id,
+            CellReference ref)
+    {
+        List<CellReference> lr = map.get(id);
+        if (lr == null) {
+            map.put(id, new ArrayList<>());
+            lr = map.get(id);
+        }
+        lr.add(ref);
+    }
 
     public void write() {
         try {
